@@ -10,6 +10,10 @@ class Rush::File < Rush::Entry
 		write('')
 		self
 	end
+	
+	def touch
+		box.touch(full_path)
+	end
 
 	# Size in bytes on disk.
 	def size

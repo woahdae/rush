@@ -4,7 +4,7 @@ require 'base64'
 
 # Mongrel handler that translates the incoming HTTP request into a
 # Rush::Connection::Local call.  The results are sent back across the wire to
-# be decoded by Rush::Connection::Remote on the other side.
+# be decoded by Rush::Connection::Rushd on the other side.
 class RushHandler < Mongrel::HttpHandler
 	def process(request, response)
 		params = {}

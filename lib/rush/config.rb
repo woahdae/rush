@@ -1,8 +1,45 @@
 # The config class accesses files in ~/.rush to load and save user preferences.
 class Rush::Config
 	DefaultPort = 7770
+	$RUSH_DIR = "#{ENV["HOME"]}/.shellby"
+	$CONFIG_FILE = "#{$RUSH_DIR}/config.yml"
 
 	attr_reader :dir
+
+	##
+	# Returns the config file as a hash, or just the section-relevant portion
+	# if +:section+ option is given
+	# === Parameters
+	# [+options+] * +:section+ - will load a first-level subsection of the config.
+	#               For example:
+	#               
+	#               <pre><code>
+	#               :mongrel:
+	#                 :environment: production
+	#                 etc...
+	#               </code></pre>
+	#               
+	#               could be loaded with :section => :mongrel (and would return 
+	#               {:environment => "production"})
+	#             * +:file+ - Defaults to ~/.shellby/config.yml. Alternate configs
+	#               are used mostly for testing.
+	# === Returns
+	# A Hash representing the loaded config. Will return everything if the
+	# +:section+ option is not specified, otherwise will return just the
+	# first-level section specified (see above).
+	#
+	# Returns {} if nothing is in the config, or the specified section
+	# doesn't exist.
+	# === Raises
+	# Nothing
+	def self.load_yaml_config(options = {})
+		config_file = options[:file] || $CONFIG_FILE
+		section = options[:section]
+		
+		config = YAML.load_file(config_file) || {}
+		return section ? config[section] || {} : config
+	end
+	
 
 	# By default, reads from the dir ~/.rush, but an optional parameter allows
 	# using another location.

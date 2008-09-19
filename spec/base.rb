@@ -22,3 +22,8 @@ end
 def mock_config_cleanup
 	FileUtils.rm_rf(mock_config_sandbox_dir)
 end
+
+class Rush::Service::Test < Rush::Service; end
+class Rush::Service::TestInstance < Rush::ServiceInstance; end
+class Rush::Service::TestMe < Rush::Service; end
+class Rush::Service::TestMeInstance < Rush::ServiceInstance; end

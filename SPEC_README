@@ -1,0 +1,7 @@
+The ssh tests run by logging in to your own computer via ssh. At first I hardcoded in my password, then moved the password to a git-ignored file, but ultimately I think we should do it via ssh keys. Thus, to run those tests you will need to do something like:
+
+cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
+
+for more info on ssh keys, see ex. http://pkeck.myweb.uga.edu/ssh/ (or google 'ssh key')
+
+I think it's better than putting the sudo password somewhere. Ex. how would you do continuous integration like that?

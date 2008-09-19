@@ -1,3 +1,5 @@
+require 'rushd/server'
+require 'rushd/ssh_tunnel'
 require 'yaml'
 
 # This class it the mirror of Rush::Connection::Local.  A Rush::Box which is
@@ -6,12 +8,15 @@ require 'yaml'
 #
 # This is an internal class that does not need to be accessed in normal use of
 # the rush shell or library.
-class Rush::Connection::Remote
+class Rush::Connection::Rushd
 	attr_reader :host, :tunnel
 
 	def initialize(host)
 		@host = host
-		@tunnel = Rush::SshTunnel.new(host)
+	end
+
+	def tunnel
+		@tunnel ||= Rush::SshTunnel.new(@host)
 	end
 
 	def write_file(full_path, contents)
@@ -40,6 +45,10 @@ class Rush::Connection::Remote
 
 	def copy(src, dst)
 		transmit(:action => 'copy', :src => src, :dst => dst)
+	end
+
+	def touch(full_path)
+		transmit(:action => 'touch', :full_path => full_path)
 	end
 
 	def read_archive(full_path)
@@ -148,5 +157,53 @@ class Rush::Connection::Remote
 
 	def config
 		@config ||= Rush::Config.new
+	end
+	
+	def remote?
+		true
+	end
+
+	alias :write   :write_file
+	alias :read    :file_contents
+	alias :rm      :destroy
+	alias :remove  :destroy
+	alias :mkdir_p :create_dir
+	alias :exec    :bash
+end
+
+class Rush::Connection::Local
+	# Raised when the action passed in by RushServer is not known.
+	class UnknownAction < Exception; end
+
+	# RushServer uses this method to transform a hash (:action plus parameters
+	# specific to that action type) into a method call on the connection.	 The
+	# returned value must be text so that it can be transmitted across the wire
+	# as an HTTP response.
+	def receive(params)
+		case params[:action]
+			when 'write_file'			then write_file(params[:full_path], params[:payload])
+			when 'file_contents'	then file_contents(params[:full_path])
+			when 'destroy'				then destroy(params[:full_path])
+			when 'purge'					then purge(params[:full_path])
+			when 'create_dir'			then create_dir(params[:full_path])
+			when 'rename'					then rename(params[:path], params[:name], params[:new_name])
+			when 'copy'						then copy(params[:src], params[:dst])
+			when 'read_archive'		then read_archive(params[:full_path])
+			when 'write_archive'	then write_archive(params[:payload], params[:dir])
+			when 'index'					then index(params[:base_path], params[:glob]).join("\n") + "\n"
+			when 'stat'						then YAML.dump(stat(params[:full_path]))
+			when 'set_access'			then set_access(params[:full_path], Rush::Access.from_hash(params))
+			when 'size'						then size(params[:full_path])
+			when 'processes'			then YAML.dump(processes)
+			when 'process_alive'	then process_alive(params[:pid]) ? '1' : '0'
+			when 'kill_process'		then kill_process(params[:pid].to_i)
+			when 'bash'						then bash(params[:payload], params[:user], params[:background] == 'true')
+		else
+			raise UnknownAction
+		end
+	end
+
+	# No-op for duck typing with rushd connection.
+	def ensure_tunnel(options={})
 	end
 end

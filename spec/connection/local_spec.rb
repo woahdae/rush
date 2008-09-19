@@ -1,112 +1,18 @@
-require File.dirname(__FILE__) + '/base'
-
+require File.dirname(__FILE__) + '/../base'
+require File.dirname(__FILE__) + '/connection_spec'
 describe Rush::Connection::Local do
 	before do
-		@sandbox_dir = "/tmp/rush_spec.#{Process.pid}"
+		@sandbox_dir = "/tmp/rush_spec.#{Process.pid}/"
 		system "rm -rf #{@sandbox_dir}; mkdir -p #{@sandbox_dir}"
 
 		@con = Rush::Connection::Local.new
+		@connection = @con
 	end
+
+	it_should_behave_like "a remote or local box"
 
 	after do
 		system "rm -rf #{@sandbox_dir}"
-	end
-
-	it "receive -> write_file(file, contents)" do
-		@con.should_receive(:write_file).with('file', 'contents')
-		@con.receive(:action => 'write_file', :full_path => 'file', :payload => 'contents')
-	end
-
-	it "receive -> file_contents(file)" do
-		@con.should_receive(:file_contents).with('file').and_return('the contents')
-		@con.receive(:action => 'file_contents', :full_path => 'file').should == 'the contents'
-	end
-
-	it "receive -> destroy(file or dir)" do
-		@con.should_receive(:destroy).with('file')
-		@con.receive(:action => 'destroy', :full_path => 'file')
-	end
-
-	it "receive -> purge(dir)" do
-		@con.should_receive(:purge).with('dir')
-		@con.receive(:action => 'purge', :full_path => 'dir')
-	end
-
-	it "receive -> create_dir(path)" do
-		@con.should_receive(:create_dir).with('dir')
-		@con.receive(:action => 'create_dir', :full_path => 'dir')
-	end
-
-	it "receive -> rename(path, name, new_name)" do
-		@con.should_receive(:rename).with('path', 'name', 'new_name')
-		@con.receive(:action => 'rename', :path => 'path', :name => 'name', :new_name => 'new_name')
-	end
-
-	it "receive -> copy(src, dst)" do
-		@con.should_receive(:copy).with('src', 'dst')
-		@con.receive(:action => 'copy', :src => 'src', :dst => 'dst')
-	end
-
-	it "receive -> read_archive(full_path)" do
-		@con.should_receive(:read_archive).with('full_path').and_return('archive data')
-		@con.receive(:action => 'read_archive', :full_path => 'full_path').should == 'archive data'
-	end
-
-	it "receive -> write_archive(archive, dir)" do
-		@con.should_receive(:write_archive).with('archive', 'dir')
-		@con.receive(:action => 'write_archive', :dir => 'dir', :payload => 'archive')
-	end
-
-	it "receive -> index(base_path, glob)" do
-		@con.should_receive(:index).with('base_path', '*').and_return(%w(1 2))
-		@con.receive(:action => 'index', :base_path => 'base_path', :glob => '*').should == "1\n2\n"
-	end
-
-	it "receive -> stat(full_path)" do
-		@con.should_receive(:stat).with('full_path').and_return(1 => 2)
-		@con.receive(:action => 'stat', :full_path => 'full_path').should == YAML.dump(1 => 2)
-	end
-
-	it "receive -> set_access(full_path, user, group, permissions)" do
-		access = mock("access")
-		Rush::Access.should_receive(:from_hash).with(:action => 'set_access', :full_path => 'full_path', :user => 'joe').and_return(access)
-
-		@con.should_receive(:set_access).with('full_path', access)
-		@con.receive(:action => 'set_access', :full_path => 'full_path', :user => 'joe')
-	end
-
-	it "receive -> size(full_path)" do
-		@con.should_receive(:size).with('full_path').and_return("1024")
-		@con.receive(:action => 'size', :full_path => 'full_path').should == "1024"
-	end
-
-	it "receive -> processes" do
-		@con.should_receive(:processes).with().and_return([ { :pid => 1 } ])
-		@con.receive(:action => 'processes').should == YAML.dump([ { :pid => 1 } ])
-	end
-
-	it "receive -> process_alive" do
-		@con.should_receive(:process_alive).with(123).and_return(true)
-		@con.receive(:action => 'process_alive', :pid => 123).should == '1'
-	end
-
-	it "receive -> kill_process" do
-		@con.should_receive(:kill_process).with(123).and_return(true)
-		@con.receive(:action => 'kill_process', :pid => '123')
-	end
-
-	it "receive -> bash (foreground)" do
-		@con.should_receive(:bash).with('cmd', 'user', false).and_return('output')
-		@con.receive(:action => 'bash', :payload => 'cmd', :user => 'user', :background => 'false').should == 'output'
-	end
-
-	it "receive -> bash (background)" do
-		@con.should_receive(:bash).with('cmd', 'user', true).and_return('output')
-		@con.receive(:action => 'bash', :payload => 'cmd', :user => 'user', :background => 'true').should == 'output'
-	end
-
-	it "receive -> unknown action exception" do
-		lambda { @con.receive(:action => 'does_not_exist') }.should raise_error(Rush::Connection::Local::UnknownAction)
 	end
 
 	it "write_file writes contents to a file" do
@@ -310,4 +216,13 @@ EOPS
 		list = [ { :uid => 0, :command => 'pureftpd' }, { :uid => 9999, :command => 'defunk' } ]
 		@con.resolve_unix_uids(list).should == [ { :uid => 0, :user => 'root', :command => 'pureftpd' }, { :uid => 9999, :command => 'defunk', :user => nil } ]
 	end
+
+	it "method_missing should pass undefined calls to the box's connection" do
+		box = Rush::Box.new
+		connection = mock('connection')
+		connection.should_receive(:something).with("parameters")
+		box.instance_variable_set(:@connection, connection)
+		box.something("parameters")
+	end
+
 end

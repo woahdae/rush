@@ -1,14 +1,14 @@
 require 'fileutils'
 require 'yaml'
 
-# Rush::Box uses a connection object to execute all rush commands.  If the box
-# is local, Rush::Connection::Local is created.  The local connection is the
-# heart of rush's internals.  (Users of the rush shell or library need never
+# Rush::Box uses a connection object to execute all rush commands.	If the box
+# is local, Rush::Connection::Local is created.	 The local connection is the
+# heart of rush's internals.	(Users of the rush shell or library need never
 # access the connection object directly, so the docs herein are intended for
 # developers wishing to modify rush.)
 #
 # The local connection has a series of methods which do the actual work of
-# modifying files, getting process lists, and so on.  RushServer creates a
+# modifying files, getting process lists, and so on.	RushServer creates a
 # local connection to handle incoming requests; the translation from a raw hash
 # of parameters to an executed method is handled by
 # Rush::Connection::Local#receive.
@@ -19,6 +19,8 @@ class Rush::Connection::Local
 			f.write contents
 		end
 		true
+	rescue Errno::ENOENT
+		raise Rush::DoesNotExist, full_path
 	end
 
 	# Read raw bytes from a file.
@@ -32,7 +34,8 @@ class Rush::Connection::Local
 	def destroy(full_path)
 		raise "No." if full_path == '/'
 		FileUtils.rm_rf(full_path)
-		true
+	rescue Errno::ENOENT
+		raise Rush::DoesNotExist, full_path
 	end
 
 	# Purge the contents of a dir.
@@ -46,9 +49,13 @@ class Rush::Connection::Local
 	end
 
 	# Create a dir.
-	def create_dir(full_path)
-		FileUtils.mkdir_p(full_path)
-		true
+	def create_dir(full_path, attrs = {})
+		# Net::SSH calls it 'permissions', while FileUtils calls it 'mode'.
+		# Thus, we should support both.
+		attrs[:mode] = attrs[:permissions] if attrs[:permissions] 
+		FileUtils.mkdir_p(full_path, attrs = {})
+	rescue Errno::ENOENT
+		raise Rush::DoesNotExist, path
 	end
 
 	# Rename an entry within a dir.
@@ -61,6 +68,39 @@ class Rush::Connection::Local
 		true
 	end
 
+	def touch(full_path)
+		FileUtils.touch(full_path)
+	rescue Errno::ENOENT
+		raise Rush::DoesNotExist, full_path
+	end
+
+  def directory?(path)
+    raise Rush::DoesNotExist, path if not ::File.exists?(path)
+    
+    ::File.directory?(path)
+  end
+
+  def entries(path, *args)
+    results = []
+    Dir.foreach(path) do |entry|
+      next if entry == "." || entry == ".." # skip these
+      
+      # skip this entry if we're not looking to list hidden directories,
+      # and the path starts with "."
+      next if !args.include?(:a) && entry =~ /^\..*?/
+
+      # append "/" to the end of the name for directories so we can easily see them
+      results << (self.directory?("#{path}/#{entry}") ? entry + "/" : entry)
+    end
+    return results.sort
+  rescue SystemCallError
+    raise Rush::DoesNotExist, path
+  end
+
+  def exists?(path)
+    File.exists?(path)
+  end
+
 	# Copy ane entry from one path to another.
 	def copy(src, dst)
 		FileUtils.cp_r(src, dst)
@@ -70,9 +110,10 @@ class Rush::Connection::Local
 	rescue RuntimeError
 		raise Rush::DoesNotExist, src
 	end
+	
 
 	# Create an in-memory archive (tgz) of a file or dir, which can be
-	# transmitted to another server for a copy or move.  Note that archive
+	# transmitted to another server for a copy or move.	 Note that archive
 	# operations have the dir name implicit in the archive.
 	def read_archive(full_path)
 		`cd #{::File.dirname(full_path)}; tar c #{::File.basename(full_path)}`
@@ -85,10 +126,10 @@ class Rush::Connection::Local
 		end
 	end
 
-	# Get an index of files from the given path with the glob.  Could return
-	# nested values if the glob contains a doubleglob.  The return value is an
+	# Get an index of files from the given path with the glob.	Could return
+	# nested values if the glob contains a doubleglob.	The return value is an
 	# array of full paths, with directories listed first.
-	def index(base_path, glob)
+	def index(base_path, glob = nil)
 		glob = '*' if glob == '' or glob.nil?
 		dirs = []
 		files = []
@@ -106,7 +147,7 @@ class Rush::Connection::Local
 		raise Rush::DoesNotExist, base_path
 	end
 
-	# Fetch stats (size, ctime, etc) on an entry.  Size will not be accurate for dirs.
+	# Fetch stats (size, ctime, etc) on an entry.	 Size will not be accurate for dirs.
 	def stat(full_path)
 		s = ::File.stat(full_path)
 		{
@@ -318,9 +359,9 @@ class Rush::Connection::Local
 			STDIN.reopen(inpipe)
 
 			if user and user != ''
-				exec "cd /; sudo -H -u #{user} bash"
+				Kernel.exec "cd /; sudo -H -u #{user} bash"
 			else
-				exec "bash"
+				Kernel.exec "bash"
 			end
 		end
 		outpipe.close
@@ -330,45 +371,22 @@ class Rush::Connection::Local
 		pid
 	end
 
-	####################################
-
-	# Raised when the action passed in by RushServer is not known.
-	class UnknownAction < Exception; end
-
-	# RushServer uses this method to transform a hash (:action plus parameters
-	# specific to that action type) into a method call on the connection.  The
-	# returned value must be text so that it can be transmitted across the wire
-	# as an HTTP response.
-	def receive(params)
-		case params[:action]
-			when 'write_file'     then write_file(params[:full_path], params[:payload])
-			when 'file_contents'  then file_contents(params[:full_path])
-			when 'destroy'        then destroy(params[:full_path])
-			when 'purge'          then purge(params[:full_path])
-			when 'create_dir'     then create_dir(params[:full_path])
-			when 'rename'         then rename(params[:path], params[:name], params[:new_name])
-			when 'copy'           then copy(params[:src], params[:dst])
-			when 'read_archive'   then read_archive(params[:full_path])
-			when 'write_archive'  then write_archive(params[:payload], params[:dir])
-			when 'index'          then index(params[:base_path], params[:glob]).join("\n") + "\n"
-			when 'stat'           then YAML.dump(stat(params[:full_path]))
-			when 'set_access'     then set_access(params[:full_path], Rush::Access.from_hash(params))
-			when 'size'           then size(params[:full_path])
-			when 'processes'      then YAML.dump(processes)
-			when 'process_alive'  then process_alive(params[:pid]) ? '1' : '0'
-			when 'kill_process'   then kill_process(params[:pid].to_i)
-			when 'bash'           then bash(params[:payload], params[:user], params[:background] == 'true')
-		else
-			raise UnknownAction
-		end
-	end
-
-	# No-op for duck typing with remote connection.
-	def ensure_tunnel(options={})
-	end
+	
 
 	# Local connections are always alive.
 	def alive?
 		true
 	end
+	
+	def remote?
+		false
+	end
+
+	alias :write   :write_file
+	alias :read    :file_contents
+	alias :rm      :destroy
+	alias :remove  :destroy
+	alias :mkdir_p :create_dir
+	alias :glob    :index
+	alias :exec    :bash
 end

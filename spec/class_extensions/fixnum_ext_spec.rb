@@ -1,4 +1,4 @@
-require File.dirname(__FILE__) + '/base'
+require File.dirname(__FILE__) + '/../base'
 
 describe Fixnum do
 	before do

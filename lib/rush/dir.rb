@@ -155,4 +155,9 @@ class Rush::Dir < Rush::Entry
 	def entries
 		contents
 	end
+
+	alias :entries :contents
+	alias :ls      :contents
+	alias :entry   :find_by_name
+	alias :glob    :find_by_glob
 end
