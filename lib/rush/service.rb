@@ -11,8 +11,10 @@
 # on the server (see +instances+ documentation for more information).
 # 
 # Your Rush::ServiceInstance subclass needs to define +start+, +stop+, 
-# +status+, and possibly +restart+ (by default it just calls +stop+ and +start+).
-# See the methods' respective documentation for more specific information.
+# +status+, and possibly +restart+ (by default restart just calls +stop+ and
+# +start+). Also, to_s should be a form of semi-verbose status. For examlpe,
+# a Mongrel service instance would report "port - status" in to_s, and a Clusterip
+# instance would report "ip - status".
 class Rush::Service
   attr_accessor :name, :box
   
@@ -79,6 +81,8 @@ class Rush::Service
     Kernel.qualified_const_get(klass).new(box, *options)
   end
 
+  ##### Instance Methods #####
+
   ##
   # Creates an instance of the service using both the options set on this
   # service (which are usually defaults form a config file) as well as 
@@ -104,16 +108,18 @@ class Rush::Service
     Rush::ServiceInstance.factory(@name, @box, all_options)
   end
 
-
   ##
   # Calls status on all of the ServiceInstances configured to be running
   # === Parameters
-  # 
+  # [+*options+] Passes these on to 
   def status(*options)
     # TODO: this is *not* how it's supposed to work. This will only give the
     # status of all *running* instances. There is no way to define what is
-    # supposed to be running.
-    self.instances
+    # /supposed/ to be running ATM, though.
+    statuses = []
+    self.instances.each {|instance| statuses << instance.to_s}
+    
+    return statuses
   end
   
   ##
@@ -136,8 +142,20 @@ class Rush::Service
   # of Rush::ServiceInstance subclass objects.
   def instances; end
 
+  ##### Class Methods #####
+  
+  def self.status(*boxes)
+    statuses = {}
+    $boxes.each {|box| statuses[box.host] = box[self.to_sym].status }
+    
+    return statuses
+  end
+
+
+  ##### Misc #####
+
   def to_s
-    status
+    puts status
   end
 
   def to_sym
@@ -155,7 +173,7 @@ class Rush::Service
   ##
   # Merges author-defined default options from 
   # Rush::Service::[Service]::DEFAULTS, config file options (usually from
-  # ~/.shellby/config.yml), and +*options+ into one options hash.
+  # ~/.rush/config.yml), and +*options+ into one options hash.
   # Author-defined defaults are loaded first and will be overwritten by any
   # options in the config file, which in turn will be overwritten by anything
   # passed into +*options+
@@ -172,7 +190,7 @@ class Rush::Service
     rescue NameError
       defaults = {}
     end
-    config_options = Rush::Config.load_yaml_config(:section => self.to_sym)
+    config_options = Rush::Config.load_yaml(:section => self.to_sym)
     these_options = options.to_options_hash
     final_options = defaults.merge(config_options).merge(these_options)
   end

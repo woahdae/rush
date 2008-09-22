@@ -35,7 +35,6 @@ describe Rush::Service do
   end
   
   describe "status" do
-    it "should call status on all instances defined"
   end
   
   describe "migrate" do
@@ -68,7 +67,7 @@ describe Rush::Service do
     it "should correctly merge defaults, config options, and parameter options, taking priority into account" do
       @service = Rush::Service::Test.new(mock(Rush::Box))
       Rush::Service::Test::DEFAULTS = {:hello => "hello", :not => false, :two_n_two => "5" }
-      Rush::Config.should_receive("load_yaml_config").with(:section => :test).and_return({:not => true, :two_n_two => "6"})
+      Rush::Config.should_receive("load_yaml").with(:section => :test).and_return({:not => true, :two_n_two => "6"})
       results = Rush::Service::Test.final_options(:two_n_two => "4")
       results.should == {:hello => "hello", :not => true, :two_n_two => "4"}
     end

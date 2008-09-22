@@ -40,13 +40,13 @@ describe Rush::Service::ClusteripInstance do
   describe "responsibility=" do
     it "should add the clusterip responsibility to the specified ip" do
       @box.should_receive(:exec).
-        with("echo '+1' | sudo tee /proc/net/ipt_CLUSTERIP/10.0.3.143 > /dev/null; echo '-2' | sudo tee /proc/net/ipt_CLUSTERIP/10.0.3.143 > /dev/null")
+        with("echo '+1' | sudo tee /proc/net/ipt_CLUSTERIP/123.456.78.90 > /dev/null; echo '-2' | sudo tee /proc/net/ipt_CLUSTERIP/123.456.78.90 > /dev/null")
       @cip_instance.responsibility = 1,-2
     end
     
     it "should work even when passed an array" do
       @box.should_receive(:exec).
-        with("echo '+1' | sudo tee /proc/net/ipt_CLUSTERIP/10.0.3.143 > /dev/null; echo '-2' | sudo tee /proc/net/ipt_CLUSTERIP/10.0.3.143 > /dev/null")
+        with("echo '+1' | sudo tee /proc/net/ipt_CLUSTERIP/123.456.78.90 > /dev/null; echo '-2' | sudo tee /proc/net/ipt_CLUSTERIP/123.456.78.90 > /dev/null")
       @cip_instance.responsibility = [1,-2]
     end
   end

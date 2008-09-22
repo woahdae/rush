@@ -1,6 +1,10 @@
 require 'readline'
 
-# Rush::Shell is used to create an interactive shell.  It is invoked by the rush binary.
+# store boxes in a global constant so that we can reuse
+# the ssh connections we create
+$boxes = []
+
+# Rush::Shell is used to create an interactive shell.	 It is invoked by the rush binary.
 module Rush
 	class Shell
 		attr_accessor :suppress_output
@@ -27,6 +31,17 @@ module Rush
 
 			eval @config.load_env, @pure_binding
 
+			# Put yaml-defined boxes as attributes on the local box.
+			boxes_config = Rush::Config.load_yaml(:section => :boxes)
+			boxes_config.each do |box_name, options|
+				login = options[:login]
+				ip = options[:ip]
+				box = Rush::Box.new("#{login + "@"}#{ip}", options)
+				$boxes << box
+				@box.class.send(:attr_accessor, box_name.to_sym)
+				@box.instance_variable_set("@#{box_name}", box)
+			end
+
 			commands = @config.load_commands
 			Rush::Dir.class_eval commands
 			Array.class_eval commands
@@ -43,7 +58,7 @@ module Rush
 		rescue ::Exception => e
 			puts "Exception #{e.class} -> #{e.message}"
 			e.backtrace.each do |t|
-				puts "   #{::File.expand_path(t)}"
+				puts "	 #{::File.expand_path(t)}"
 			end
 		end
 
@@ -102,11 +117,11 @@ module Rush
 					puts "=> #{count_s}"
 				end
 			else
-				puts "=> #{res.inspect}"
+				puts "=> #{res.to_s}"
 			end
 		end
 
-		def path_parts(input)   # :nodoc:
+		def path_parts(input)		# :nodoc:
 			input.match(/(\w+(?:\[[^\]]+\])*)\[(['"])([^\]]+)$/)
 			$~.to_a.slice(1, 3).push($~.pre_match)
 		rescue
@@ -117,7 +132,7 @@ module Rush
 		#
 		# Example:
 		#
-		# dir['subd    # presing tab here will produce dir['subdir/ if subdir exists
+		# dir['subd		 # presing tab here will produce dir['subdir/ if subdir exists
 		#
 		# This isn't that cool yet, because it can't do multiple levels of subdirs.
 		# It does work remotely, though, which is pretty sweet.

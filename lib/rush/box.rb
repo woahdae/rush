@@ -12,7 +12,7 @@
 #
 class Rush::Box
 	attr_reader :host, :connection
-
+  
 	# Instantiate a box.	No action is taken to make a connection until you try
 	# to perform an action.	 If the box is remote, an ssh tunnel will be opened.
 	# Specify a username with the host if the remote ssh user is different from

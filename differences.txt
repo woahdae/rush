@@ -1,0 +1,5 @@
+Differences
+* Default return is result.to_s rather than result.inspect. This way I can call result.inspect if I really do want to inspect my object, but by default it looks nice.
+* Method names try to follow their common name, i.e. as named in bash and/or File, Dir, FileUtils, and NetSFTP libraries. ex. copy_to is copy or cp, create is touch, etc.
+* A box by default initiates an ssh connection unless you say Rush::Box.new('host', :rushd). Ideally it would check to see if the rushd is running first, then fall back to ssh, but this was easy :-)
+* Although this isn't a difference yet, it might be nice to have some commands behave in a more bash-like way. Should Rush::Dir#ls return an array of Rush::Dir and Rush::File objects, or an array of strings? Seems like an array of strings would be appropriate. Perhaps Rush::Dir#entries would return Rush::Entry subclass instances. Makes sense to me.

@@ -1,8 +1,9 @@
+require 'fileutils'
 # The config class accesses files in ~/.rush to load and save user preferences.
 class Rush::Config
 	DefaultPort = 7770
-	$RUSH_DIR = "#{ENV["HOME"]}/.shellby"
-	$CONFIG_FILE = "#{$RUSH_DIR}/config.yml"
+	$RUSH_DIR = "#{ENV["HOME"]}/.rush"
+	$YAML_CONFIG = "#{$RUSH_DIR}/config.yml"
 
 	attr_reader :dir
 
@@ -21,7 +22,7 @@ class Rush::Config
 	#               
 	#               could be loaded with :section => :mongrel (and would return 
 	#               {:environment => "production"})
-	#             * +:file+ - Defaults to ~/.shellby/config.yml. Alternate configs
+	#             * +:file+ - Defaults to ~/.rush/config.yml. Alternate configs
 	#               are used mostly for testing.
 	# === Returns
 	# A Hash representing the loaded config. Will return everything if the
@@ -32,10 +33,11 @@ class Rush::Config
 	# doesn't exist.
 	# === Raises
 	# Nothing
-	def self.load_yaml_config(options = {})
-		config_file = options[:file] || $CONFIG_FILE
+	def self.load_yaml(options = {})
+		config_file = options[:file] || $YAML_CONFIG
 		section = options[:section]
-		
+
+		FileUtils.touch(config_file)
 		config = YAML.load_file(config_file) || {}
 		return section ? config[section] || {} : config
 	end
